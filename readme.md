@@ -16,11 +16,11 @@ Before running the model:
 
 To run the complete model:
 
-- `python main.py`, which TBC...
+- Run `python main.py`, which does nothing right now but will at some point.
 
-To run individual notebooks,Going through the note
+To run individual notebooks:
 
-- `clean_data.ipynb`, which takes as input raw data in data/ and produces tidy tables in data/
+- Run `clean_data.ipynb`, which takes in raw data from data/ and produces out tidy data to data/
 - TBC...
 
 __Make sure to open Jupyter Lab or Jupyter Notebook in the root ./ folder, not within the notebook/ folder. This ensures that all file paths referenced are with respect to the root folder.__
