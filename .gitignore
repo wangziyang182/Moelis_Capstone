@@ -1,1 +1,7 @@
 notebook/.ipynb_checkpoints/
+*.RData
+*.Rhistory
+*.pdf
+*.log
+*.html
+notebooks/.ipynb_checkpoints/

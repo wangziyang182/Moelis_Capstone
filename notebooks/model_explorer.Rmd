@@ -1,0 +1,519 @@
+---
+title: "explore_return"
+author: "Michael She"
+date: "10/25/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(forcats)
+library(tidyverse)
+library(lubridate)
+library(data.table)
+library(ggplot2)
+library(ggalluvial)
+library(stargazer)
+```
+
+# Data
+
+```{r}
+nan_mean <- purrr::partial(mean, na.rm = TRUE)
+nan_median <- purrr::partial(median, na.rm = TRUE)
+
+df_campaign_mapping <- fread('mapping/campaign_mapping.csv')
+df_value_mapping <- fread('mapping/value_demand_mapping.csv')
+df_proxy_mapping <- fread('mapping/proxy_result_mapping.csv')
+
+
+df <- fread(
+  'data/engineered_factset_campaign_data.csv',
+  stringsAsFactors = TRUE,
+  na.strings = c("", "NA", "#N/A")
+) %>%
+  .[, campaign_announcement_date := as.Date(campaign_announcement_date)] %>%
+  .[campaign_announcement_date >= as.Date("1995-01-01")]
+
+df <- df %>%
+  .[, campaign_objective_primary := forcats::fct_explicit_na(campaign_objective_primary)] %>%
+  merge(df_campaign_mapping, by = "campaign_objective_primary", all.x = TRUE, all.y = FALSE) %>%
+  .[, campaign_objective_group :=  forcats::as_factor(campaign_objective_group)]
+
+df <- df %>%
+  .[, value_demand := forcats::fct_explicit_na(value_demand)] %>%
+  merge(df_value_mapping, by = "value_demand", all.x = TRUE, all.y = FALSE) %>%
+  .[, value_demand_group :=  forcats::as_factor(value_demand_group)]
+
+df <- df %>%
+  .[, governance_demand := forcats::fct_explicit_na(governance_demand)]
+
+df <- df %>%
+  .[, proxy_campaign_winner_or_result := forcats::fct_explicit_na(proxy_campaign_winner_or_result)] %>%
+  merge(df_proxy_mapping, by = "proxy_campaign_winner_or_result", all.x = TRUE, all.y = FALSE) %>%
+  .[, proxy_campaign_result_group := forcats::as_factor(proxy_campaign_result_group)]
+
+df <- df %>%
+  .[, number_of_board_seats_gained := fifelse(is.na(number_of_board_seats_gained), 0, number_of_board_seats_gained)] %>%
+  .[, board_seats_percentage_gained := number_of_board_seats_gained / number_of_board_seats_sought] %>%
+  .[, board_seats_result := dplyr::case_when(
+    board_seats_percentage_gained >= 1 ~ 'Dissident',
+    board_seats_percentage_gained > 0 ~ 'Management',
+    board_seats_percentage_gained <= 0 ~ 'Fail'
+  )] %>%
+  .[, board_seats_result := forcats::as_factor(board_seats_result)] %>%
+  .[, board_seats_result := forcats::fct_explicit_na(board_seats_result)] 
+  
+df <- df %>%
+  .[, return_result := fifelse(cumulative_6m_residual_return > 0, "positive_return", "negative_return")] %>%
+  .[, return_result := fifelse(is.na(return_result), "unknown_return", return_result)] %>%
+  .[, return_result := forcats::as_factor(return_result)]
+
+```
+
+## Summaries
+
+```{r}
+glimpse(df)
+```
+
+```{r}
+df[, .N, keyby = lubridate::ceiling_date(campaign_announcement_date, unit = "1 year")] %>% print
+```
+
+
+```{r}
+df[, .N, by = campaign_objective_primary] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = value_demand] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = governance_demand] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = proxy_campaign_winner_or_result] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = proxy_campaign_result_group] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = board_seats_result] %>% setorder(N) %>% print
+```
+
+```{r}
+df[, .N, by = return_result] %>% setorder(N) %>% print
+```
+
+```{r}
+df[value_demand_group == "Unused", list(value_demand_group, value_demand)]
+```
+
+
+# Visualizations
+
+```{r}
+df_total_returns <- df %>%
+  melt.data.table(
+    id.vars = c(
+      "campaign_id",
+      "campaign_announcement_date",
+      "campaign_objective_primary",
+      "glass_lewis_support",
+      "iss_support",
+      "ownership_pecent_on_announcements"
+    ),
+    measure.vars = c(
+      "pre_18m_total_return",
+      "pre_12m_total_return",
+      "pre_6m_total_return",
+      "post_6m_total_return",
+      "post_12m_total_return", 
+      "post_18m_total_return"
+    ),
+    variable.name = c("return_period"),
+    value.name = c("return_value")
+  )
+
+df_residual_returns <- df %>%
+  melt.data.table(
+    id.vars = c(
+      "campaign_id",
+      "campaign_announcement_date",
+      "campaign_objective_primary",
+      "glass_lewis_support",
+      "iss_support",
+      "ownership_pecent_on_announcements"
+    ),
+    measure.vars = c(
+      "pre_18m_residual_return",
+      "pre_12m_residual_return",
+      "pre_6m_residual_return",
+      "post_6m_residual_return",
+      "post_12m_residual_return", 
+      "post_18m_residual_return"
+    ),
+    variable.name = c("return_period"),
+    value.name = c("return_value")
+  )
+
+df_returns <- list(total = df_total_returns, residual = df_residual_returns) %>%
+  rbindlist(use.names = TRUE, fill = TRUE, idcol = "return_type")
+
+df_average_returns <- df_returns %>%
+  .[
+    j = list(return_value = mean(return_value, na.rm = TRUE)),
+    keyby = list(return_type, return_period)
+  ]
+
+df_yearly_returns <- df_returns %>%
+  .[
+    j = list(return_value = mean(return_value, na.rm = TRUE)),
+    keyby = list(return_type, return_period, campaign_announcement_date = lubridate::ceiling_date(campaign_announcement_date, unit = "1 year"))
+  ]
+```
+
+```{r}
+df_yearly_returns %>%
+  .[return_period %in% c("post_12m_total_return", "post_12m_residual_return")] %>%
+  ggplot() +
+  geom_col(aes(x = campaign_announcement_date, y = return_value, fill = return_period), position = "dodge") +
+  facet_wrap(~return_type, ncol = 1)
+```
+
+```{r}
+df_returns %>%
+  ggplot() +
+  geom_boxplot(aes(x = glass_lewis_support, y = return_value, fill = return_period), outlier.shape = NA, position = "dodge") +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~return_type, ncol = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(-0.15, 0.15)
+```
+
+```{r}
+df_returns %>%
+  ggplot() +
+  geom_boxplot(aes(x = iss_support, y = return_value, fill = return_period), outlier.shape = NA, position = "dodge") +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~return_type, ncol = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(-0.15, 0.15)
+```
+
+
+```{r}
+df_returns %>%
+  ggplot() +
+  geom_boxplot(aes(x = campaign_objective_primary, y = return_value, fill = return_period), outlier.shape = NA, position = "dodge") +
+  facet_wrap(~return_type, ncol = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(-0.15, 0.15)
+```
+
+## Return Bars
+
+```{r}
+df %>%
+  ggplot() +
+  geom_boxplot(aes(x = reorder(proxy_campaign_winner_or_result, cumulative_6m_residual_return, nan_median), y = cumulative_6m_residual_return)) +
+  geom_hline(yintercept = 0) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent, limits = c(-0.15, 0.15)) +
+  labs(
+    title = "Resdiual Returns by Proxy Outcome",
+    subtitle = "average monthly 6-month pre to 6-month post market adjusted return of target companies by value demand.",
+    x = "Campaign Objective",
+    y = "Cumulative Residual Return"
+  )
+```
+
+```{r}
+df %>%
+  ggplot() +
+  geom_boxplot(aes(x = reorder(campaign_objective_primary, cumulative_6m_residual_return, nan_median), y = cumulative_6m_residual_return)) +
+  geom_hline(yintercept = 0) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylim(-0.15, 0.15) +
+  scale_y_continuous(labels = scales::percent, limits = c(-0.15, 0.15)) +
+  labs(
+    title = "Resdiual Returns by Campaign Objective",
+    subtitle = "average monthly 6-month pre to 6-month post market adjusted return of target companies by value demand.",
+    x = "Campaign Objective",
+    y = "Cumulative Residual Return"
+  )
+```
+
+```{r}
+df %>%
+  .[
+    j = list(cumulative_6m_residual_return = mean(cumulative_6m_residual_return, na.rm = TRUE)),
+    keyby = list(campaign_objective_primary)
+  ] %>%
+  ggplot() +
+  geom_col(aes(
+    x = reorder(campaign_objective_primary, cumulative_6m_residual_return, nan_median),
+    y = cumulative_6m_residual_return)
+  ) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Cumulative Resdiual Returns by Campaign Objective",
+    subtitle = "Cumulative 6-month pre to 6-month post market adjusted return of target companies by campaign objective.",
+    x = "Campaign Objective",
+    y = "Cumulative Residual Return"
+  )
+```
+
+```{r}
+df %>%
+  .[
+    j = list(cumulative_6m_residual_return = mean(cumulative_6m_residual_return, na.rm = TRUE)),
+    keyby = list(campaign_objective_primary, proxy_campaign_result_group)
+  ] %>%
+  ggplot() +
+  geom_col(aes(
+    x = reorder(campaign_objective_primary, cumulative_6m_residual_return, nan_median),
+    y = cumulative_6m_residual_return)
+  ) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~proxy_campaign_result_group) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Cumulative Resdiual Returns by Campaign Objective",
+    subtitle = "Cumulative 6-month pre to 6-month post market adjusted return of target companies by campaign objective.",
+    x = "Campaign Objective",
+    y = "Cumulative Residual Return"
+  )
+```
+
+```{r}
+df %>%
+  ggplot() +
+  geom_boxplot(aes(x = reorder(value_demand, cumulative_6m_residual_return, nan_median), y = cumulative_6m_residual_return)) +
+  geom_hline(yintercept = 0) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(-0.15, 0.15) +
+  labs(
+    title = "Cumulative Resdiual Returns by Value Demand",
+    subtitle = "Cumulative 6-month pre to 6-month post market adjusted return of target companies by value demand.",
+    x = "Value Demand",
+    y = "Cumulative Residual Return"
+  )
+```
+
+```{r}
+df %>%
+  ggplot() +
+  geom_boxplot(aes(x = reorder(governance_demand, cumulative_6m_residual_return, nan_median), y = cumulative_6m_residual_return)) +
+  geom_hline(yintercept = 0) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(-0.15, 0.15) +
+  labs(
+    title = "Cumulative Resdiual Returns by Governance Demand",
+    subtitle = "Cumulative 6-month pre to 6-month post market adjusted return of target companies by governance demand.",
+    x = "Value Demand",
+    y = "Cumulative Residual Return"
+  )
+```
+
+## Return Sankeys
+
+```{r}
+df[, .N, by = list(campaign_objective_group, board_seats_result, return_result)] %>%
+  .[board_seats_result %in% c("Management", "Dissident")] %>%
+  ggplot(aes(axis1 = campaign_objective_group, axis2 = board_seats_result, axis3 = return_result, y = N)) +
+  geom_alluvium(aes(fill = return_result)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_discrete(limits = c("Value Demand", "Board Seats Result", "Return Result"), expand = c(.1, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Value Demands, Proxy Campaign Results and Return Result",
+    subtitle = "Proportion of campaigns by value demand that lead to various proxy campaign and return outcomes."
+  ) +
+  theme(legend.position = 'bottom')
+```
+
+
+```{r}
+df[, .N, by = list(value_demand_group, board_seats_result, return_result)] %>%
+  .[board_seats_result %in% c("Management", "Dissident")] %>%
+  ggplot(aes(axis1 = value_demand_group, axis2 = board_seats_result, axis3 = return_result, y = N)) +
+  geom_alluvium(aes(fill = return_result)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_discrete(limits = c("Value Demand", "Board Seats Result", "Return Result"), expand = c(.1, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Value Demands, Proxy Campaign Results and Return Result",
+    subtitle = "Proportion of campaigns by value demand that lead to various proxy campaign and return outcomes."
+  ) +
+  theme(legend.position = 'bottom')
+```
+
+
+```{r}
+df[, .N, by = list(value_demand_group, proxy_campaign_result_group, return_result)] %>%
+  .[proxy_campaign_result_group %in% c("Management", "Dissident")] %>%
+  ggplot(aes(axis1 = value_demand_group, axis2 = proxy_campaign_result_group, axis3 = return_result, y = N)) +
+  geom_alluvium(aes(fill = return_result)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_discrete(limits = c("Value Demand", "Proxy Campaign Result", "Return Result"), expand = c(.1, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Value Demands, Proxy Campaign Results and Return Result",
+    subtitle = "Proportion of campaigns by value demand that lead to various proxy campaign and return outcomes."
+  ) +
+  theme(legend.position = 'bottom')
+```
+
+```{r}
+df[, .N, by = list(campaign_objective_group, proxy_campaign_result_group, return_result)] %>%
+  .[proxy_campaign_result_group %in% c("Management", "Dissident")] %>%
+  ggplot(aes(axis1 = campaign_objective_group, axis2 = proxy_campaign_result_group, axis3 = return_result, y = N)) +
+  geom_alluvium(aes(fill = return_result)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_discrete(limits = c("Campaign Objective", "Proxy Campaign Result", "Return Result"), expand = c(.1, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Value Demands, Proxy Campaign Results and Return Result",
+    subtitle = "Proportion of campaigns by value demand that lead to various proxy campaign and return outcomes."
+  ) +
+  theme(legend.position = 'bottom')
+```
+
+# Models
+
+```{r}
+df_model_data <- df %>%
+  .[j = list(
+    campaign_objective_primary,
+    campaign_objective_group,
+    value_demand,
+    value_demand_group,
+    governance_demand,
+    earnings_yield_at_announcement,
+    ownership_pecent_on_announcement,
+    glass_lewis_support,
+    iss_support,
+    proxy_campaign_winner_or_result,
+    proxy_campaign_result_group,
+    board_seats_result
+  )] 
+
+df_proxy_data <- df_model_data %>%
+  .[proxy_campaign_result_group %in% c("Dissident", "Management")] %>%
+  .[, proxy_campaign_result_group := proxy_campaign_result_group %>% as.character %>% as_factor] 
+
+df_board_data <- df_model_data %>%
+  .[board_seats_result %in% c("Dissident", "Management")] %>%
+  .[, board_seats_result := board_seats_result %>% as.character %>% as_factor] 
+  
+```
+
+```{r}
+glimpse(df_model_data)
+```
+
+
+
+    .[, positive_1_year_post_date_total_return := `1_year_post_date_total_return` >= 0] %>%
+    .[, past_return := `1_year_pre_date_total_return`] %>%
+    .[, earnings_yield := earnings_yield_at_announcement] %>%
+    .[, objective := campaign_objective_group] %>%
+    .[, result := proxy_result] %>%
+    .[, positive_post_return := positive_1_year_post_date_total_return] %>%
+    .[, post_return := `1_year_post_date_total_return`] %>%
+    .[, positive_post_residual_return := `1_year_post_date_residual_return` >= 0] %>%
+    .[, post_residual_return := `1_year_post_date_residual_return`] %>%
+    .[, ownership := ownership_pecent_on_announcements]
+
+```{r}
+model <- glm(
+  data = df_proxy_data,
+  formula = (
+    proxy_campaign_result_group ~
+      value_demand_group +
+      governance_demand + 
+      campaign_objective_group +
+      earnings_yield_at_announcement +
+      ownership_pecent_on_announcement +
+      glass_lewis_support +
+      iss_support
+  ),
+  family = "binomial"
+)
+
+summary(model)
+
+stargazer(model, type = "text")
+
+df_model_coefficients <- model %>%
+  broom::tidy() %>%
+  as.data.table() %>%
+  .[, odds_estimate := exp(estimate)] %>%
+  .[, probability_estimate := odds_estimate / (1 + odds_estimate)]
+
+print(df_model_coefficients %>% as.tibble())
+
+df_model_coefficients %>%
+  ggplot() +
+  geom_col(aes(x = term, y = odds_estimate)) +
+  geom_hline(yintercept = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Odds Coefficients from Logistic Regression"
+  )
+```
+
+
+```{r}
+model <- glm(
+  data = df_proxy_data,
+  formula = (
+    proxy_campaign_result_group ~
+      value_demand_group +
+      governance_demand + 
+      campaign_objective_group +
+      earnings_yield_at_announcement +
+      ownership_pecent_on_announcement +
+      glass_lewis_support +
+      iss_support
+  ),
+  family = "binomial"
+)
+
+summary(model)
+
+stargazer(model, type = "text")
+
+df_model_coefficients <- model %>%
+  broom::tidy() %>%
+  as.data.table() %>%
+  .[, odds_estimate := exp(estimate)] %>%
+  .[, probability_estimate := odds_estimate / (1 + odds_estimate)]
+
+print(df_model_coefficients %>% as.tibble())
+
+df_model_coefficients %>%
+  ggplot() +
+  geom_col(aes(x = term, y = odds_estimate)) +
+  geom_hline(yintercept = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Odds Coefficients from Logistic Regression"
+  )
+```
