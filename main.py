@@ -291,14 +291,14 @@ def engineer_features(df_factset_campaign_cleaned, df_factset_betas):
     logger.info('calculating earnings yield')
     df_engineering = (
         df_engineering
-        .assign(pre_18m_earnings_yield=lambda df: df.pre_18m_price_to_earnings)
-        .assign(pre_12m_earnings_yield=lambda df: df.pre_12m_price_to_earnings)
-        .assign(pre_6m_earnings_yield=lambda df: df.pre_6m_price_to_earnings)
-        .assign(pre_3m_earnings_yield=lambda df: df.pre_3m_price_to_earnings)
+        .assign(pre_18m_earnings_yield=lambda df: 1 / df.pre_18m_price_to_earnings)
+        .assign(pre_12m_earnings_yield=lambda df: 1 / df.pre_12m_price_to_earnings)
+        .assign(pre_6m_earnings_yield=lambda df: 1 / df.pre_6m_price_to_earnings)
+        .assign(pre_3m_earnings_yield=lambda df: 1 / df.pre_3m_price_to_earnings)
         .assign(earnings_yield_at_announcement=lambda df: df.ltm_eps_at_announcement / df.price_at_announcement)
-        .assign(post_6m_earnings_yield=lambda df: df.post_6m_price_to_earnings)
-        .assign(post_12m_earnings_yield=lambda df: df.post_12m_price_to_earnings)
-        .assign(post_18m_earnings_yield=lambda df: df.post_18m_price_to_earnings)
+        .assign(post_6m_earnings_yield=lambda df: 1 / df.post_6m_price_to_earnings)
+        .assign(post_12m_earnings_yield=lambda df: 1 / df.post_12m_price_to_earnings)
+        .assign(post_18m_earnings_yield=lambda df: 1 / df.post_18m_price_to_earnings)
     )
 
     # price returns
@@ -390,6 +390,14 @@ def engineer_features(df_factset_campaign_cleaned, df_factset_betas):
         how='left',
         on=['campaign_id', 'company_id']
     )
+
+    # clean market returns and beta when missing
+    for column in df_engineering.columns.tolist():
+        if 'market_return' in column:
+            df_engineering[column] = df_engineering[column].fillna(0)
+        if 'beta' in column:
+            df_engineering[column] = df_engineering[column].fillna(0)
+
     df_engineering['pre_6m_residual_return'] = df_engineering['pre_6m_total_return'] - df_engineering['pre_6m_market_return'] * df_engineering['beta']
     df_engineering['pre_12m_residual_return'] = df_engineering['pre_12m_total_return'] - df_engineering['pre_12m_market_return'] * df_engineering['beta']
     df_engineering['pre_18m_residual_return'] = df_engineering['pre_18m_total_return'] - df_engineering['pre_18m_market_return'] * df_engineering['beta']    
@@ -397,8 +405,16 @@ def engineer_features(df_factset_campaign_cleaned, df_factset_betas):
     df_engineering['post_12m_residual_return'] = df_engineering['post_12m_total_return'] - df_engineering['post_12m_market_return'] * df_engineering['beta']
     df_engineering['post_18m_residual_return'] = df_engineering['post_18m_total_return'] - df_engineering['post_18m_market_return'] * df_engineering['beta']
 
-    # annualize
+    # coalsece returns
+    logger.info('coalescing residual, total and price returns')
+    df_engineering['pre_6m_residual_return']   = df_engineering['pre_6m_residual_return'].fillna(df_engineering['pre_6m_total_return'].fillna(df_engineering['pre_6m_price_return']))  
+    df_engineering['pre_12m_residual_return']  = df_engineering['pre_12m_residual_return'].fillna(df_engineering['pre_12m_total_return'].fillna(df_engineering['pre_12m_price_return'])) 
+    df_engineering['pre_18m_residual_return']  = df_engineering['pre_18m_residual_return'].fillna(df_engineering['pre_18m_total_return'].fillna(df_engineering['pre_18m_price_return'])) 
+    df_engineering['post_6m_residual_return']  = df_engineering['post_6m_residual_return'].fillna(df_engineering['post_6m_total_return'].fillna(df_engineering['post_6m_price_return'])) 
+    df_engineering['post_12m_residual_return'] = df_engineering['post_12m_residual_return'].fillna(df_engineering['post_12m_total_return'].fillna(df_engineering['post_12m_price_return']))
+    df_engineering['post_18m_residual_return'] = df_engineering['post_18m_residual_return'].fillna(df_engineering['post_18m_total_return'].fillna(df_engineering['post_18m_price_return']))
 
+    # annualize
     logger.info('converting all returns to monthly frequency returns')
 
     df_engineering['pre_18m_price_return'] = df_engineering['pre_18m_price_return'] / 18
@@ -428,33 +444,29 @@ def engineer_features(df_factset_campaign_cleaned, df_factset_betas):
 
     logger.info('winsorizing returns')
 
-    df_engineering['pre_18m_total_return'] = df_engineering['pre_18m_total_return'].clip(-1, 2)
-    df_engineering['pre_12m_total_return'] = df_engineering['pre_12m_total_return'].clip(-1, 2)
-    df_engineering['pre_6m_total_return'] = df_engineering['pre_6m_total_return'].clip(-1, 2)
-    df_engineering['pre_3m_total_return'] = df_engineering['pre_3m_total_return'].clip(-1, 2)
-    df_engineering['post_6m_total_return'] = df_engineering['post_6m_total_return'].clip(-1, 2)
-    df_engineering['post_12m_total_return'] = df_engineering['post_12m_total_return'].clip(-1, 2)
-    df_engineering['post_18m_total_return'] = df_engineering['post_18m_total_return'].clip(-1, 2)
+    # clean market returns and beta when missing
+    for column in df_engineering.columns.tolist():
+        if 'return' in column:
+            df_engineering[column] = df_engineering[column].clip(-1, 2)
+        if 'earnings_yield' in column:
+            df_engineering[column] = df_engineering[column].clip(-1, 2)
+        if 'dividend' in column:
+            df_engineering[column] = df_engineering[column].clip(0, 1)
 
-    df_engineering['pre_18m_residual_return'] = df_engineering['pre_18m_residual_return'].clip(-1, 2)
-    df_engineering['pre_12m_residual_return'] = df_engineering['pre_12m_residual_return'].clip(-1, 2)
-    df_engineering['pre_6m_residual_return'] = df_engineering['pre_6m_residual_return'].clip(-1, 2)
-    df_engineering['post_6m_residual_return'] = df_engineering['post_6m_residual_return'].clip(-1, 2)
-    df_engineering['post_12m_residual_return'] = df_engineering['post_12m_residual_return'].clip(-1, 2)
-    df_engineering['post_18m_residual_return'] = df_engineering['post_18m_residual_return'].clip(-1, 2)
+    # for horizon in ['3m', '6m', '12m', '18m']:
+    #     for direction in ['pre', 'post']:
+    #         for return_type in ['price_return', 'total_return', 'residual_return']:
+    #             return_column = f'{direction}_{horizon}_{return_type}_return'
+    #             try:
+    #                 df_engineering[return_column] = df_engineering[return_column].clip(-1, 2)
+    #             except:
+    #                 pass
 
     # cumulative abnormal returns
     logger.info('calculating cumulative abnormal returns')
     df_engineering['cumulative_6m_residual_return'] = df_engineering['pre_6m_residual_return'] + df_engineering['post_6m_residual_return']
-    df_engineering['cumulative_12m_residual_return'] = df_engineering['pre_12m_residual_return'] + df_engineering['post_12m_total_return']
-    df_engineering['cumulative_18m_residual_return'] = df_engineering['pre_18m_residual_return'] + df_engineering['post_18m_total_return']
-
-    # return categories
-    logger.info('binning returns')
-    bins = [-1, 0, 5]
-    df_engineering['post_6m_total_return_bin'] = pd.cut(df_engineering['post_6m_total_return'], bins=bins)
-    df_engineering['post_12m_total_return_bin'] = pd.cut(df_engineering['post_12m_total_return'], bins=bins)
-    df_engineering['post_18m_total_return_bin'] = pd.cut(df_engineering['post_18m_total_return'], bins=bins)
+    df_engineering['cumulative_12m_residual_return'] = df_engineering['pre_12m_residual_return'] + df_engineering['post_12m_residual_return']
+    df_engineering['cumulative_18m_residual_return'] = df_engineering['pre_18m_residual_return'] + df_engineering['post_18m_residual_return']
 
     # filter
     #logger.info('filtering')
