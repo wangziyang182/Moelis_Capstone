@@ -516,6 +516,7 @@ def main():
         print(h1('cleaning'))
         df_factset_campaign_cleaned = clean_data(df_factset_campaign)
         write_data(df_factset_campaign_cleaned, 'data/clean_factset_campaign_data.csv')
+        write_data(df_factset_pricing, 'data/clean_factset_pricing.csv')
 
         print(h1('betas'))
         df_factset_betas = calculate_betas(df_factset_campaign_cleaned, df_factset_pricing, df_sp_pricing)
