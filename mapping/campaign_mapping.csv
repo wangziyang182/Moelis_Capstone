@@ -1,16 +1,16 @@
-﻿campaign_objective_primary,campaign_objective_group
-13D Filer - No Publicly Disclosed Activism,(Missing)
-(Missing),(Missing)
-Board Representation,BOARD
-Board Control,BOARD
-Maximize Shareholder Value,GENERAL
-Enhance Corporate Governance,GENERAL
-Hostile/Unsolicited Acquisition,HOSTILEACQ
-Vote/Activism Against a Merger,BLOCKMERGER
-"Remove Director(s), No Dissident Nominee to Fill Vacancy",REMOVE
-Remove Officer(s),REMOVE
-Public Short Position/Bear Raid,SHORT
-Vote For a Stockholder Proposal,SUPPDISS
-Vote Against a Management Proposal,SUPPDISS
-Support Dissident Group in Proxy Fight,SUPPDISS
-Vote For a Management Proposal/Support Management,SUPPMGMT
+﻿campaign_objective_code,campaign_objective_primary,campaign_objective_group
+(Missing),13D Filer - No Publicly Disclosed Activism,(Missing)
+(Missing),(Missing),(Missing)
+Board Representation,Board Representation,Add Directors
+Board Control,Board Control,Add Directors
+Maximize Value,Maximize Shareholder Value,Generic Objective
+Enhance Governance,Enhance Corporate Governance,Generic Objective
+Hostile Acquisition,Hostile/Unsolicited Acquisition,Facilitate M&A
+Block Merger,Vote/Activism Against a Merger,Block M&A
+Remove Directors,"Remove Director(s), No Dissident Nominee to Fill Vacancy",Remove Directors
+Remove Officers,Remove Officer(s),Remove Directors
+Short,Public Short Position/Bear Raid,Short
+Vote For Dissident,Vote For a Stockholder Proposal,Vote For Dissident
+Vote Against Management,Vote Against a Management Proposal,Vote For Dissident
+Support For Dissident,Support Dissident Group in Proxy Fight,Vote For Dissident
+Vote For Management,Vote For a Management Proposal/Support Management,Vote For Management

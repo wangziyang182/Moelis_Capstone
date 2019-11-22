@@ -1,8 +1,8 @@
-﻿proxy_campaign_winner_or_result,proxy_campaign_result_group
-Dissident,Dissident
-Settled/Concessions Made,Dissident
-Management,Management
-Withdrawn,Management
-Pending,Pending
-Split,Split
-(Missing),(Missing)
+﻿proxy_result_code,proxy_campaign_winner_or_result,proxy_result_group
+Dissident,Dissident,Dissident
+Dissident,Settled/Concessions Made,Dissident
+Management,Management,Management
+Management,Withdrawn,Management
+Pending,Pending,(Missing)
+Split,Split,Management
+(Missing),(Missing),(Missing)

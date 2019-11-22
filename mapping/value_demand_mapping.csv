@@ -1,14 +1,14 @@
-﻿value_demand,value_demand_group
-(Missing),(Missing)
-"Other Capital Structure Related, Increase Leverage, etc.",CAP
-"Breakup Company, Divest Assets/Divisions",DIVEST
-Fund specific: Change Investment Strategy,FUND
-Fund specific: Realize Net Asset Value/Open-End a Closed-End Fund,FUND
-General Discussions/Underperformance,GENERAL
-Review Strategic Alternatives,GENERAL
-Block Acquisition/Agitate for Lower Price (Shareholder of Acquirer),M&A
-Seek Sale/Merger/Liquidation,M&A
-Block Merger/Agitate for Higher Price (Shareholder of Target),M&A
-Potential Acquisition (Friendly and Unfriendly),M&A
-Return Cash via Dividends/Buybacks,PAY
-Separate Real Estate/Create REIT,REIT
+﻿value_demand_code,value_demand,value_demand_group
+(Missing),(Missing),(Missing)
+Capital Structure,"Other Capital Structure Related, Increase Leverage, etc.",Capital Structure
+Divest,"Breakup Company, Divest Assets/Divisions",Divest
+Fund Change,Fund specific: Change Investment Strategy,Change Fund
+Fund Open,Fund specific: Realize Net Asset Value/Open-End a Closed-End Fund,Change Fund
+General Discussion,General Discussions/Underperformance,Generic Value
+General Strategy,Review Strategic Alternatives,Generic Value
+Block Acquisition,Block Acquisition/Agitate for Lower Price (Shareholder of Acquirer),Block M&A
+Seek Merger,Seek Sale/Merger/Liquidation,Facilitate M&A
+Block Merger,Block Merger/Agitate for Higher Price (Shareholder of Target),Block M&A
+Seek Acquisition,Potential Acquisition (Friendly and Unfriendly),Facilitate M&A
+Payout,Return Cash via Dividends/Buybacks,Payout
+Separate Real Estate,Separate Real Estate/Create REIT,Change Fund

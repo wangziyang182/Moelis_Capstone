@@ -1,9 +1,9 @@
 ﻿governance_demand_code,governance_demand,governance_demand_group
-Board Seats,Board Seats (activist group),BOARD
-Other,Other Governance Enhancements,OTHER
-Compensation,Compensation Related Enhancements,COMP
-Remove Directors,Remove Director(s),BOARD
+Board Seats,Board Seats (activist group),Add Directors
+Other,Other Governance Enhancements,Other
+Compensation,Compensation Related Enhancements,Compensation
+Remove Directors,Remove Director(s),Remove Directors
 ESG,Social/Environmental/Political Issues,ESG
-Remove Defenses,Remove Takeover Defenses,M&A
-Add Directors,Add Independent Directors,BOARD
-Remove Officers,Remove Officer(s),M&A
+Remove Takeover Defenses,Remove Takeover Defenses,Facilitate M&A
+Add Directors,Add Independent Directors,Add Directors
+Remove Officers,Remove Officer(s),Remove Directors
