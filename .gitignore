@@ -5,3 +5,5 @@ notebook/.ipynb_checkpoints/
 *.log
 *.html
 notebooks/.ipynb_checkpoints/
+mapping/activist_mapping.csv
+mapping/company_mapping.csv
