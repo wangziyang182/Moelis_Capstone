@@ -8,9 +8,13 @@ import dash_table as dash_table
 
 from datetime import datetime as dt
 from dash.dependencies import Input, Output
+from joblib import dump, load
 
-df = pd.read_csv('data/engineered_factset_campaign_data.csv')
+df = pd.read_csv('data/engineered_factset_campaign.csv')
 df_pricing = pd.read_csv('data/clean_factset_pricing.csv', parse_dates=['date'])
+
+df_campaign_return_data = pd.read_csv('results/campaign_return_model_data.csv')
+campaign_return_model = load('results/campaign_return_model.joblib') 
 
 app = dash.Dash(
     __name__,
@@ -61,28 +65,26 @@ app.layout = dash_html.Div(
             initial_visible_month=dt(2017, 12, 15),
             date=str(dt(2017, 12, 31, 23, 59, 59))
         ),
+
         dash_html.H2(children='Overrides'),
         dash_html.P(children='Under construction...'),
+
         dash_html.H2(children='Data'),
         dash_html.H3(children='Campaign Data'),
-        dash_html.Div(
-            id='campaign-table-container'
-        ),
+        dash_html.Div(id='campaign-table-container'),
         dash_html.H3(children='Activist Data'),
-        dash_html.Div(
-            id='activist-table-container'
-        ),
+        dash_html.Div(id='activist-table-container'),
         dash_html.H3(children='Target Company Data'),
-        dash_html.Div(
-            id='target-graph-container'
-        ),
+        dash_html.Div(id='target-graph-container'),
+
         dash_html.H2(children='Models'),
-        dash_html.H3(children='Campaign Objective Model'),
-        dash_html.P(children='Under construction...'),
-        dash_html.H3(children='Campaign Outcome Model'),
-        dash_html.P(children='Under construction...'),
+        # dash_html.H3(children='Campaign Objective Model'),
+        # dash_html.P(children='Under construction...'),
+        # dash_html.H3(children='Campaign Outcome Model'),
+        # dash_html.P(children='Under construction...'),
         dash_html.H3(children='Campaign Return Model'),
-        dash_html.P(children='Under construction...')
+        dash_html.Div(id='return-prediction-container'),
+
     ],
     className='pretty_container',
     style={
@@ -156,6 +158,15 @@ def update_graph(selected_campaign_id):
         }
     })
 
+@app.callback(
+    Output('return-prediction-container', 'children'),
+    [Input('selected-campaign-id', 'value')]
+)
+def update_model_prediction(selected_campaign_id):
+    df_x = df_campaign_return_data[lambda df: df.campaign_id == selected_campaign_id].iloc[:, 1::]
+    y_predicted = campaign_return_model.predict(df_x)
+    y_predicted_label = 'POSITIVE' if y_predicted == 1 else 'NEGATIVE'
+    return dash_html.Div(children=f"The predicted campaign return is: {y_predicted_label}")
 
 def display_table(df):
     return dash_table.DataTable(
