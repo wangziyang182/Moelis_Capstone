@@ -7,3 +7,6 @@ notebook/.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
 mapping/activist_mapping.csv
 mapping/company_mapping.csv
+notebook/.RDataTmp
+results/campaign_return_model.joblib
+results/campaign_return_model_data.csv
