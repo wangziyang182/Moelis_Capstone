@@ -17,7 +17,90 @@ library(data.table)
 library(ggplot2)
 library(ggalluvial)
 library(stargazer)
+
+ggplot2::theme_set(ggplot2::theme_bw())
 ```
+
+```{r}
+df_campaign <- fread('../data/engineered_factset_campaign.csv')
+df_pricing <- fread('../data/clean_factset_pricing.csv') %>% .[, date := as.Date(date)]
+df_index <- fread('../data/yahoo_finance_pricing.csv')
+df_tweets <- fread('../data/twitter_tweets.csv')
+
+df_campaign_mapping <- fread('../mapping/campaign_mapping.csv')
+
+df_campaign <- merge(df_campaign, df_campaign_mapping, by = "campaign_objective_primary", all.x = TRUE, all.y = FALSE)
+```
+
+
+```{r}
+df_plot <- df_pricing %>%
+  .[company_id == "0GGD8K-E"] %>%
+  .[, volatility := sd(stock_daily_return, na.rm = TRUE)] %>%
+  .[, announcement_price := price[date == "2018-04-16"]] %>%
+  .[, announcement_time := difftime(date, as.Date("2018-04-15"), units = "days") %>% as.numeric] %>% 
+  .[date %between% c("2018-04-15", "2019-04-15"), price_upper := announcement_price + sqrt(announcement_time) * announcement_price * volatility * 2] %>%
+  .[date %between% c("2018-04-15", "2019-04-15"), price_lower := announcement_price - sqrt(announcement_time) * announcement_price * volatility * 2] %>%
+  .[date %between% c("2018-04-15", "2019-04-15"), price_predicted := announcement_price + announcement_price * announcement_time * 0.025 / 30] %>%
+  .[date %between% c("2016-10-15", "2019-04-15")] 
+
+df_plot %>%
+  ggplot() +
+  geom_line(aes(x = date, y = price, color = "actual")) + 
+  geom_line(aes(x = date, y = price_predicted, color = "predicted")) + 
+  geom_line(aes(x = date, y = price_upper)) +
+  geom_line(aes(x = date, y = price_lower)) +
+  geom_ribbon(aes(x = date, ymin = price_lower, ymax = price_upper), fill = "lightblue", alpha = 0.3) +
+  geom_vline(xintercept = as.Date("2018-10-15"), linetype = 2) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(
+    title = "Predicted and Actual Campaign Returns for Dell Technologies, Inc. / Carl C. Icahn",
+    subtitle = "Campaign announced on 2018-10-15 to seek higher price for merger",
+    color = "Predicted vs. Actual",
+    x = "Date", y = "Price"
+  )
+```
+
+```{r}
+df_campaign %>%
+  .[cumulative_6m_residual_return <= 1] %>%
+  ggplot() + 
+  geom_histogram(aes(x = cumulative_6m_residual_return)) +
+  geom_vline(aes(xintercept = median(df_campaign$cumulative_6m_residual_return, na.rm = TRUE), color = "median"), size = 1) +
+  geom_vline(aes(xintercept = mean(df_campaign$cumulative_6m_residual_return, na.rm = TRUE), color = "mean"), size = 1) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Histogram of Cumulative Abnormal Monthly Returns for Activist Campaigns",
+    subtitle = "Market-adjusted returns from -6 months to +6 months around announcement (9,571 Campaigns from 1984 to 2018)",
+    y = "Frequency",
+    x = "Campaign Return",
+    color = "Statistic"
+  )
+```
+
+```{r}
+df_campaign %>%
+  .[!is.na(cumulative_6m_residual_return)] %>%
+  .[, cumulative_6m_residual_return_is_positive := ifelse(cumulative_6m_residual_return > 0, "Positive Camapign Return", "Negative Campaign Return")] %>%
+  .[, .N, by = list(campaign_objective_code, cumulative_6m_residual_return_is_positive)] %>%
+  .[N >= 150] %>%
+  .[order(N, decreasing = TRUE)] %>%
+  .[, campaign_objective_code := forcats::as_factor(campaign_objective_code)] %>%
+  ggplot(aes(axis1 = campaign_objective_code, axis2 = cumulative_6m_residual_return_is_positive, y = N)) +
+  geom_alluvium(aes(fill = cumulative_6m_residual_return_is_positive)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", label.strata = TRUE) +
+  scale_x_discrete(limits = c("Campaign Objective", "Campaign Return"), expand = c(.1, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Campaign Objectives and Campaign Returns",
+    subtitle = "Counts of campaigns objectives and their particular return outcomes (9,571 Campaigns from 1984 to 2018)",
+    y = "Count of Campaigns",
+    fill = "Campaign Return Direction"
+  ) +
+  theme(legend.position = 'bottom')
+```
+
 
 # Data
 
@@ -28,7 +111,6 @@ nan_median <- purrr::partial(median, na.rm = TRUE)
 df_campaign_mapping <- fread('mapping/campaign_mapping.csv')
 df_value_mapping <- fread('mapping/value_demand_mapping.csv')
 df_proxy_mapping <- fread('mapping/proxy_result_mapping.csv')
-
 
 df <- fread(
   'data/engineered_factset_campaign_data.csv',
@@ -328,23 +410,6 @@ df %>%
 ```
 
 ## Return Sankeys
-
-```{r}
-df[, .N, by = list(campaign_objective_group, board_seats_result, return_result)] %>%
-  .[board_seats_result %in% c("Management", "Dissident")] %>%
-  ggplot(aes(axis1 = campaign_objective_group, axis2 = board_seats_result, axis3 = return_result, y = N)) +
-  geom_alluvium(aes(fill = return_result)) +
-  geom_stratum() +
-  geom_text(stat = "stratum", label.strata = TRUE) +
-  scale_x_discrete(limits = c("Value Demand", "Board Seats Result", "Return Result"), expand = c(.1, .05)) +
-  theme_minimal() +
-  labs(
-    title = "Value Demands, Proxy Campaign Results and Return Result",
-    subtitle = "Proportion of campaigns by value demand that lead to various proxy campaign and return outcomes."
-  ) +
-  theme(legend.position = 'bottom')
-```
-
 
 ```{r}
 df[, .N, by = list(value_demand_group, board_seats_result, return_result)] %>%
